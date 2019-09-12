@@ -6,7 +6,7 @@ let config = {
     player_height: 5,
     player_color: '#FF0',
 
-    sky_color: '#7ed6df',
+    sky_color: '#4c4c4a',
     ground_color: '#555',
     pipe_color: '#050',
 
@@ -14,6 +14,7 @@ let config = {
     pipe_width: 100,
 
     limit: 100,
+    vitesse: 1,
 
 };
 
@@ -43,7 +44,7 @@ let render = Render.create({
         height: config.height,
         wireframes: false,
         showAngleIndicator: false,
-        background: './ciel.png',
+        background: config.sky_color,
     }
 });
 setTimeout(function () {
@@ -69,16 +70,16 @@ let pop = [],
 let group = Body.nextGroup(true);
 
 let players = [], end, level = 1;
-let category = ['#ED4C67', '#130f40', '#686de0', '#dff9fb'];
+let category = ['#ED4C67', '#000000', '#fff', '#e4ea9b'];
 
 let init = () => {
     players = [];
     for (let i = 1; i < 3; i++){
-        players.push(Bodies.rectangle(5, config.height/2, config.player_width, config.player_height, {
+        players.push(Bodies.circle(5, config.height/2, config.player_width, {
             id: -i,
             //frictionAir: 0.1,
             collisionFilter: {group: group},
-            veloce: 3,
+            veloce: config.vitesse,
             render: {
                 sprite: {
                     texture: './flappy.png',
@@ -92,7 +93,9 @@ let init = () => {
         id: 0,
         isStatic: true,
         render: {
-            fillStyle: category[0],
+            sprite: {
+                texture: './end.png',
+            }
         },
     });
 }
@@ -106,13 +109,13 @@ let createLevel = (level) => {
     
     
     let obstacles = [];
-    for (let i = 0; i <= Math.sqrt(level) * 2; i++){
+    for (let i = 0; i <= Math.sqrt(level) * 6; i++){
         let type = Math.round(Math.random() * (config.limit * (category.length - 1)) + 1);
         obstacles.push(Bodies.rectangle(
-            Math.random() * (config.width / 2) + config.width / 4, 
-            Math.random() * (config.height / 1.5) + config.height / 3, 
-            Math.random() * config.width / 3 + 100, 
-            Math.random() * config.height / 3 + 100, 
+            Math.random() * (config.width -100) + 50, 
+            Math.random() * config.height, 
+            Math.random() * config.width / 6 + 50, 
+            Math.random() * config.height / 6 + 50, 
             {
                 id: type,
                 isStatic: true,
@@ -126,22 +129,23 @@ let createLevel = (level) => {
     }
     obstacles.sort((a, b) => {return b.id - a.id;});
     World.add(world, obstacles);
-    World.add(world, players.concat(end));
+    World.add(world, [end].concat(players));
 };
 
-Events.on(engine, 'collisionStart', function(e) {
-    let pairs = e.pairs;
+Events.on(engine, 'collisionActive', function(e) {
+    let pairs = e.pairs.length > 1 ? 
+        e.pairs.sort((a, b) => {return b.bodyB.id - a.bodyB.id}) : e.pairs;
     for (let pair of pairs) {
         let player = players.find((el) => {return pair.bodyA.id === el.id || pair.bodyB.id === el.id});
         if (player){
             if ((pair.bodyA.id > config.limit && pair.bodyA.id <= config.limit * 2) || (pair.bodyB.id > config.limit && pair.bodyB.id <= config.limit * 2)){
-                Body.setVelocity(player, {x: 0, y: 0});
+                player.veloce = config.vitesse * 2;
                 continue;
             }
             if ((pair.bodyA.id > config.limit * 2 && pair.bodyB.id <= config.limit * 3)  || (pair.bodyB.id > config.limit * 2 && pair.bodyB.id <= config.limit * 3)){
-                Body.setVelocity(player, {x: 0, y: 0});
+                player.veloce = config.vitesse / 2;
                 continue;
-            }            
+            }
             if (pair.bodyB.id === 0 || pair.bodyA.id === 0){
                 level += 1;
                 createLevel(level);
@@ -150,29 +154,12 @@ Events.on(engine, 'collisionStart', function(e) {
         }
     }
 });
-Events.on(engine, 'collisionActive', function(e) {
-    let pairs = e.pairs.length > 1 ? 
-        e.pairs.sort((a, b) => {return b.bodyB.id - a.bodyB.id}) : e.pairs;
-    for (let pair of pairs) {
-        let player = players.find((el) => {return pair.bodyA.id === el.id || pair.bodyB.id === el.id});
-        if (player){
-            if ((pair.bodyA.id > config.limit && pair.bodyA.id <= config.limit * 2) || (pair.bodyB.id > config.limit && pair.bodyB.id <= config.limit * 2)){
-                player.veloce = 5;
-                continue;
-            }
-            if ((pair.bodyA.id > config.limit * 2 && pair.bodyB.id <= config.limit * 3)  || (pair.bodyB.id > config.limit * 2 && pair.bodyB.id <= config.limit * 3)){
-                player.veloce = 1.5;
-                continue;
-            }
-        }
-    }
-});
 Events.on(engine, 'collisionEnd', function(e) {
     let pairs = e.pairs;
     for (let pair of pairs) { 
         if ((pair.bodyA.id < 0 || pair.bodyB.id < 0)){
-            pair.bodyA.veloce = 3;
-            pair.bodyB.veloce = 3;
+            pair.bodyA.veloce = config.vitesse;
+            pair.bodyB.veloce = config.vitesse;
         }
     }
 });
@@ -189,14 +176,16 @@ Events.on(engine, 'tick', function(e) {
     for (let player of players) {
         if (player.position.y > config.height) Body.setPosition(player, {x: player.position.x, y: 0});
         if (player.position.y < 0) Body.setPosition(player, {x: player.position.x, y: config.height});
-        if (map["ArrowLeft"])           Body.setVelocity(players[0], {x: -players[0].veloce, y: 0});
-        if (map["ArrowRight"])          Body.setVelocity(players[0], {x: players[0].veloce, y: 0});
-        if (map["ArrowUp"])             Body.setVelocity(players[0], {x: 0, y: -players[0].veloce});
-        if (map["ArrowDown"])           Body.setVelocity(players[0], {x: 0, y: players[0].veloce});
-        if (map["KeyA"])                Body.setVelocity(players[1], {x: -players[1].veloce, y: 0}); 
-        if (map["KeyD"])                Body.setVelocity(players[1], {x: players[1].veloce, y: 0}); 
-        if (map["KeyW"])                Body.setVelocity(players[1], {x: 0, y: -players[1].veloce});
-        if (map["KeyS"])                Body.setVelocity(players[1], {x: 0, y: players[1].veloce});
+        if (player.position.x > config.width) Body.setPosition(player, {x: config.width, y: player.position.y});
+        if (player.position.x < 0) Body.setPosition(player, {x: 0, y: player.position.y});
+        if (map["ArrowLeft"])           Body.translate(players[0], {x: -players[0].veloce, y: players[0].velocity.y});
+        if (map["ArrowRight"])          Body.translate(players[0], {x: players[0].veloce, y: players[0].velocity.y});
+        if (map["ArrowUp"])             Body.translate(players[0], {x: players[0].velocity.x, y: -players[0].veloce});
+        if (map["ArrowDown"])           Body.translate(players[0], {x: players[0].velocity.x, y: players[0].veloce});
+        if (map["KeyA"])                Body.translate(players[1], {x: -players[1].veloce, y: players[1].velocity.y}); 
+        if (map["KeyD"])                Body.translate(players[1], {x: players[1].veloce, y: players[1].velocity.y}); 
+        if (map["KeyW"])                Body.translate(players[1], {x: players[1].velocity.x, y: -players[1].veloce});
+        if (map["KeyS"])                Body.translate(players[1], {x: players[1].velocity.x, y: players[1].veloce});
     }
 });
 
